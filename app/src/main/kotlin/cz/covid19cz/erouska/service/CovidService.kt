@@ -80,6 +80,12 @@ class CovidService : Service() {
             return serviceIntent
         }
 
+        fun scan(c: Context): Intent {
+            val serviceIntent = Intent(c, CovidService::class.java)
+            serviceIntent.action = ACTION_RESUME
+            return serviceIntent
+        }
+
         fun isRunning(context: Context): Boolean {
             val manager =
                 context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager?

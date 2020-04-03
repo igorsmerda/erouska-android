@@ -1,10 +1,12 @@
 package cz.covid19cz.erouska.bt
 
+import android.app.PendingIntent
 import android.bluetooth.*
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.ParcelUuid
 import androidx.databinding.ObservableArrayList
@@ -17,10 +19,10 @@ import cz.covid19cz.erouska.ext.asHexLower
 import cz.covid19cz.erouska.ext.execute
 import cz.covid19cz.erouska.ext.hexAsByteArray
 import cz.covid19cz.erouska.ext.hoursToMilis
+import cz.covid19cz.erouska.receiver.BtScanReceiver
 import cz.covid19cz.erouska.utils.L
 import cz.covid19cz.erouska.utils.isBluetoothEnabled
 import io.reactivex.Observable
-import io.reactivex.Single
 import io.reactivex.disposables.Disposable
 import no.nordicsemi.android.support.v18.scanner.*
 import java.util.*
@@ -52,7 +54,7 @@ class BluetoothRepository(
 
     private var gattFailDisposable: Disposable? = null
 
-    private val scanCallback = object : ScanCallback() {
+    val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             onScanResult(result)
         }
@@ -69,7 +71,7 @@ class BluetoothRepository(
         }
     }
 
-    private val scanIosOnBackgroundCallback = object : ScanCallback() {
+    val scanIosOnBackgroundCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             onScanIosOnBackgroundResult(result)
         }
@@ -190,20 +192,35 @@ class BluetoothRepository(
             .setLegacy(true)
             .setScanMode(AppConfig.scanMode)
             .setUseHardwareFilteringIfSupported(true)
+            .setUseHardwareBatchingIfSupported(true)
+            .setReportDelay(3000)
             .build()
 
         val iOSScannerSettings: ScanSettings = ScanSettings.Builder()
             .setLegacy(false)
             .setScanMode(AppConfig.scanMode)
             .setUseHardwareFilteringIfSupported(true)
+            .setUseHardwareBatchingIfSupported(true)
+            .setReportDelay(3000)
             .build()
+
+        val androidIntent = Intent(context, BtScanReceiver::class.java)
+        androidIntent.action = BtScanReceiver.ACTION_ANDROID
+        val androidPendingIntent =
+            PendingIntent.getBroadcast(context, 0, androidIntent, PendingIntent.FLAG_CANCEL_CURRENT)
+
+        val iosIntent = Intent(context, BtScanReceiver::class.java)
+        iosIntent.action = BtScanReceiver.ACTION_IOS
+        val iosPendingIntent =
+            PendingIntent.getBroadcast(context, 0, androidIntent, PendingIntent.FLAG_CANCEL_CURRENT)
 
         BluetoothLeScannerCompat.getScanner().startScan(
             listOf(
                 ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE_UUID)).build()
             ),
             androidScannerSettings,
-            scanCallback
+            context,
+            androidPendingIntent
         )
         isScanningIosOnBackground = true
 
@@ -214,7 +231,8 @@ class BluetoothRepository(
                     .build()
             ),
             iOSScannerSettings,
-            scanIosOnBackgroundCallback
+            context,
+            iosPendingIntent
         )
         isScanning = true
     }
