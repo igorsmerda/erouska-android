@@ -150,7 +150,7 @@ class CovidService : Service() {
 
     private fun start() {
         resume()
-        wakeLockManager.acquire()
+//        wakeLockManager.acquire()
     }
 
     private fun resume() {
@@ -161,7 +161,7 @@ class CovidService : Service() {
     }
 
     private fun stop(intent: Intent) {
-        wakeLockManager.release()
+//        wakeLockManager.release()
         servicePaused = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_DETACH)

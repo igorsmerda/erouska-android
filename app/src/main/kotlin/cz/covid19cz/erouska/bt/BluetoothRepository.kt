@@ -20,6 +20,7 @@ import cz.covid19cz.erouska.ext.execute
 import cz.covid19cz.erouska.ext.hexAsByteArray
 import cz.covid19cz.erouska.ext.hoursToMilis
 import cz.covid19cz.erouska.receiver.BtScanReceiver
+import cz.covid19cz.erouska.receiver.IOSScanReceiver
 import cz.covid19cz.erouska.utils.L
 import cz.covid19cz.erouska.utils.isBluetoothEnabled
 import io.reactivex.Observable
@@ -43,6 +44,8 @@ class BluetoothRepository(
         const val APPLE_MANUFACTURER_ID = 76
     }
 
+    private var iosPendingIntent: PendingIntent? = null
+    private var androidPendingIntent: PendingIntent? = null
     private val scanResultsMap = HashMap<String, ScanSession>()
     private val discoveredIosDevices = HashMap<String, ScanSession>()
     private val gattQueue: Queue<GattConnectionQueueEntry> = LinkedList()
@@ -193,7 +196,7 @@ class BluetoothRepository(
             .setScanMode(AppConfig.scanMode)
             .setUseHardwareFilteringIfSupported(true)
             .setUseHardwareBatchingIfSupported(true)
-            .setReportDelay(3000)
+            .setReportDelay(10000)
             .build()
 
         val iOSScannerSettings: ScanSettings = ScanSettings.Builder()
@@ -201,18 +204,18 @@ class BluetoothRepository(
             .setScanMode(AppConfig.scanMode)
             .setUseHardwareFilteringIfSupported(true)
             .setUseHardwareBatchingIfSupported(true)
-            .setReportDelay(3000)
+            .setReportDelay(10000)
             .build()
 
         val androidIntent = Intent(context, BtScanReceiver::class.java)
         androidIntent.action = BtScanReceiver.ACTION_ANDROID
-        val androidPendingIntent =
+        androidPendingIntent =
             PendingIntent.getBroadcast(context, 0, androidIntent, PendingIntent.FLAG_CANCEL_CURRENT)
 
-        val iosIntent = Intent(context, BtScanReceiver::class.java)
+        val iosIntent = Intent(context, IOSScanReceiver::class.java)
         iosIntent.action = BtScanReceiver.ACTION_IOS
-        val iosPendingIntent =
-            PendingIntent.getBroadcast(context, 0, androidIntent, PendingIntent.FLAG_CANCEL_CURRENT)
+        iosPendingIntent =
+            PendingIntent.getBroadcast(context, 0, iosIntent, PendingIntent.FLAG_CANCEL_CURRENT)
 
         BluetoothLeScannerCompat.getScanner().startScan(
             listOf(
@@ -220,7 +223,7 @@ class BluetoothRepository(
             ),
             androidScannerSettings,
             context,
-            androidPendingIntent
+            androidPendingIntent!!
         )
         isScanningIosOnBackground = true
 
@@ -232,7 +235,7 @@ class BluetoothRepository(
             ),
             iOSScannerSettings,
             context,
-            iosPendingIntent
+            iosPendingIntent!!
         )
         isScanning = true
     }
@@ -241,8 +244,8 @@ class BluetoothRepository(
         isScanning = false
         isScanningIosOnBackground = false
         L.d("Stopping BLE scanning")
-        BluetoothLeScannerCompat.getScanner().stopScan(scanCallback)
-        BluetoothLeScannerCompat.getScanner().stopScan(scanIosOnBackgroundCallback)
+        iosPendingIntent?.let { BluetoothLeScannerCompat.getScanner().stopScan(context, it) }
+        androidPendingIntent?.let { BluetoothLeScannerCompat.getScanner().stopScan(context, it) }
         saveDataAndClearScanResults()
         gattFailDisposable?.dispose()
     }
